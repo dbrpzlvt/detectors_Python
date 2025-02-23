@@ -16,14 +16,14 @@ sample_gk_var1.xlsm
 /pythonProject/detectors_gk_autodor OLD.py
 /pythonProject/detectors_gk_autodor.py
 
-/raw_data/2024/Исходные данные/*
-!"/raw_data/2024/Исходные данные/М-5/Svodniy_otchet_po_chasam_intensivnost+skorost_01.01.2024_31.01.2025_1738522021.xlsx"
+/raw_data/2024/Исходные данные/**
+!/raw_data/2024/Исходные данные/М-5/Svodniy_otchet_po_chasam_intensivnost+skorost_01.01.2024_31.01.2025_1738522021.xlsx
 
 /raw_data/2024/Первичная обработка/*
-!"/raw_data/2024/Первичная обработка/PRE_км 217+600 а.д М-5 Урал Москва - Челябинск .xlsx"
+!/raw_data/2024/Первичная обработка/PRE_км 217+600 а.д М-5 Урал Москва - Челябинск .xlsx
 
 /raw_data/2023/Исходные данные/*
-!"/raw_data/2023/Исходные данные/М-5 км 84_км 384_2023.xlsx"
+!/raw_data/2023/Исходные данные/М-5 км 84_км 384_2023.xlsx
 
 /raw_data/2023/Первичная обработка/*
-!"/raw_data/2023/Первичная обработка/PRE_км 217+600 а.д М-5 Урал Москва - Челябинск .xlsx"
+!/raw_data/2023/Первичная обработка/PRE_км 217+600 а.д М-5 Урал Москва - Челябинск .xlsx
