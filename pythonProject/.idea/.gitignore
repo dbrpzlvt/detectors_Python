@@ -1,0 +1,29 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+raw_data/
+pre_sample_r1.xlsx
+pre_sample_r2.xlsx
+требования к проекту.txt
+maximize.xlsm
+sample_fda_var1.xlsm
+sample_fda_var2.xlsm
+sample_gk_var1.xlsm
+вопросы.txt
+новый 1.txt
+out/Р-119/
+out/Р-120/
+out/basic_stats_intensivnosti — копия.xlsx
+out/basic_stats_SSID — копия.xlsx
+pythonProject/detectors - fda_rosautodor OLD.py
+pythonProject/detectors_fda_rosautodor.py
+pythonProject/detectors_gk_autodor OLD.py
+pythonProject/detectors_gk_autodor.py
+QGIS/
+raw_data/2024/
+raw_data/2023/
