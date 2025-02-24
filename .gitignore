@@ -6,6 +6,9 @@ maximize.xlsm
 sample_fda_var1.xlsm
 sample_fda_var2.xlsm
 sample_gk_var1.xlsm
+Детекторы - 2024.xlsx
+.gitignore
+/pythonProject/kalman.py
 /QGIS/*
 /out/Р-119/*
 /out/Р-120/*
