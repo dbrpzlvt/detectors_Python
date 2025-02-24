@@ -69,15 +69,19 @@ class Checking:
     def make_long(self, df, cur_year, file, which_sample):
         self.editor.insert(tk.END, f'Превращаю данные файла {file} в длинный формат...\n')
         self.editor.see(END)
-        if list(df.tail(3)[0])[0] == 'Итого':
-            df.drop(df.tail(3).index, inplace=True)  # удаляю последние три строки ['Итого', 'Среднее', '%']
-        elif list(df.tail(3)[0])[0] != 'Итого' and list(df.tail(3)[0])[1] == 'Среднее':
-            df.drop(df.tail(2).index, inplace=True)
-        elif list(df.tail(3)[0])[0] != 'Итого' and list(df.tail(3)[0])[1] != 'Среднее' and list(df.tail(3)[0])[
-            2] == '%':
-            df.drop(df.tail(1).index, inplace=True)
-        else:
-            pass
+        # if list(df.tail(3)[0])[0] == 'Итого':
+            # df.iloc[:len(df) - (df[df.columns[0]].to_numpy() == 'Итого')[::-1].argmax()]
+        df = df.iloc[:df[df[df.columns[0]] == 'Итого'].index[0]].copy()
+            # df.drop(df.tail(3).index, inplace=True)  # удаляю последние три строки ['Итого', 'Среднее', '%']
+        # elif list(df.tail(3)[0])[0] != 'Итого' and list(df.tail(3)[0])[1] == 'Среднее':
+        #     df = df.iloc[:df[df[df.columns[0]] == 'Среднее'].index[0]]
+        #     # df.drop(df.tail(2).index, inplace=True)
+        # elif list(df.tail(3)[0])[0] != 'Итого' and list(df.tail(3)[0])[1] != 'Среднее' and list(df.tail(3)[0])[
+        #     2] == '%':
+        #     df = df.iloc[:df[df[df.columns[0]] == '%'].index[0]]
+        #     # df.drop(df.tail(1).index, inplace=True)
+        # else:
+        #     pass
 
         if which_sample == 'Rosautodor_1':
             self.column_names = self.wb_data.sheets['Исходные данные'].range('A3:Y4').value
