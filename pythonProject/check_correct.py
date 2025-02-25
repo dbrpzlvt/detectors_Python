@@ -15,6 +15,8 @@ from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from matplotlib.dates import MonthLocator, DateFormatter
 from matplotlib import colors as mcolors
+from matplotlib.gridspec import GridSpec
+import matplotlib.ticker as mtick
 # plt.switch_backend('agg')
 from tqdm import tqdm
 import tkinter as tk
@@ -804,7 +806,7 @@ class Checking:
         # global bs_SSID
         # global bs_intensivnosti
         # SSID - транслитерация от СреднеСуточная Интенсивность Движения
-        basic_stats_SSID = pd.concat([avg_annual_per_24_h_TG.astype(str).replace('nan', '0.0'),
+        self.basic_stats_SSID = pd.concat([avg_annual_per_24_h_TG.astype(str).replace('nan', '0.0'),
                                       max_value.to_frame().T.astype(str).replace('nan', '0.0'),
                                       min_value.to_frame().T.astype(str).replace('nan', '0.0'),
                                       mean_value.to_frame().T.astype(str).replace('nan', '0.0'),
@@ -818,21 +820,28 @@ class Checking:
                                       max_hour_day_cross_section.to_frame().T.astype(str).replace('nan', '0.0'),
                                       max_hour_night_cross_section.to_frame().T.astype(str).replace('nan', '0.0'),
                                       days_of_max.to_frame().T.replace('NaT', '0.0')], axis=0).reset_index()
-        basic_stats_SSID.index = [detector_id] * len(basic_stats_SSID)
+        self.basic_stats_SSID.index = [detector_id] * len(self.basic_stats_SSID)
 
-        basic_stats_intensivnosti = pd.concat([coeff_by_month,
+        self.basic_stats_intensivnosti = pd.concat([coeff_by_month,
                                                coeff_by_weekday,
                                                coeff_by_hour], axis=0).reset_index()
-        basic_stats_intensivnosti.index = [detector_id] * len(basic_stats_intensivnosti)
+        self.basic_stats_intensivnosti.index = [detector_id] * len(self.basic_stats_intensivnosti)
 
-        return basic_stats_SSID, basic_stats_intensivnosti
+        return self.basic_stats_SSID, self.basic_stats_intensivnosti
 
     def plot_graphs(self, df_main_clear, df_total_long, cur_year, file, freq='d'):
         self.parent.update_idletasks()
         time.sleep(2)
         self.editor.insert(tk.END, f'Рисую графики для файла {file}...\n')
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 10))
+        # fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 10))
+        fig = plt.figure(figsize=(20, 10))
         fig.suptitle(f'{file}', fontsize=13)
+        gs = GridSpec(3, 2, figure=fig)
+        ax1 = fig.add_subplot(gs[0, :])
+        ax2 = fig.add_subplot(gs[1, :])
+        ax3 = fig.add_subplot(gs[-1, 0])
+        ax4 = fig.add_subplot(gs[-1, 1])
+
         colors_line = ['cornflowerblue', 'darkblue']
         colors_dots = ['lime', 'limegreen']
         directions = ['Прямое', 'Обратное']
@@ -891,7 +900,7 @@ class Checking:
                 ax1.set_title(
                     'Суточная интенсивность: скорректированные (дополненные) данные')  # Заголовок первого графика
                 ax1.legend(loc='best')  # Указываем, где разместить легенду
-                ax1.set_ylabel('Количество / Заполненное значение')  # Подпись оси Y
+                ax1.set_ylabel('Дополненное количество')  # Подпись оси Y
                 ax1.set_xlabel('Время')  # Подпись оси X
 
         for idx, j in enumerate(directions):
@@ -925,8 +934,55 @@ class Checking:
                 ax2.set_ylabel('Количество')  # Подпись оси Y
                 ax2.set_xlabel('Время')  # Подпись оси X
 
+        basic_stats_intensivnosti_long = self.basic_stats_intensivnosti.reset_index().set_index(['level_0', 'index']) \
+            .melt(ignore_index=False).reset_index(names=['detector_id', 'type'])
+
+        for idx, j in enumerate(directions):
+            # создаю графики для недельной и часовой интенсивности
+            # j = 'Прямое'
+            weekdays_list = ["Monday", "Tuesday", "Wednesday", "Thursday",
+                             "Friday", "Saturday", "Sunday"]
+            hours_list = ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10',
+                          '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21',
+                          '22', '23']
+            colors_intens = {'Прямое': ['red', 'salmon', 'coral', 'tomato', 'orangered'],
+                             # ['red', 'blue', 'orange', 'green', 'purple'],
+                             'Обратное': ['blue', 'skyblue', 'royalblue', 'dodgerblue', 'steelblue'],
+                             # ['teal', 'deeppink', 'cyan', 'yellow', 'peru'],
+                             'Итого': ['orange', 'goldenrod', 'darkorange', 'gold',
+                                       'khaki']}  # ['orange', 'goldenrod', 'darkorange', 'gold', 'khaki']}
+
+            for i, tg_name in enumerate(['Все ТГ', 'ТГ-1', 'ТГ-2', 'ТГ-3', 'ТГ-4']):
+                # tg_name = 'Все ТГ'
+                weekday = basic_stats_intensivnosti_long.query(
+                    f"direction == '{j}' and type in {weekdays_list} and TG == '{tg_name}'") \
+                    .set_index('type').reindex(weekdays_list).reset_index()  # .replace(np.nan, 0)
+                hour = basic_stats_intensivnosti_long.query(
+                    f"direction == '{j}' and type in {hours_list} and TG == '{tg_name}'")
+                # for k in range(15):
+                #     color_index = k // 5
+                if not weekday.empty:
+                    ax3.plot(weekday['type'],
+                             weekday['value'],
+                             color=colors_intens[j][i % 5],
+                             label=f'{tg_name}, {j}')
+
+                    ax4.plot(hour['type'],
+                             hour['value'],
+                             color=colors_intens[j][i % 5],
+                             label=f'{tg_name}, {j}')
+        ax3.yaxis.set_major_formatter(mtick.PercentFormatter(1, decimals=0))
+        ax3.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=5, fontsize=9)
+        ax3.set_ylabel('Процент')  # Подпись оси Y
+        ax3.set_xlabel('День недели')  # Подпись оси X
+
+        ax4.yaxis.set_major_formatter(mtick.PercentFormatter(1, decimals=0))
+        ax4.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=5, fontsize=9)
+        ax4.set_ylabel('Процент')  # Подпись оси Y
+        ax4.set_xlabel('Часы')  # Подпись оси X
+
         plt.rcParams['font.size'] = 12
-        plt.legend(loc='best')
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        # plt.legend(loc='best')
+        # plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.savefig(f'../raw_data/{cur_year}/Графики/' + 'PIC' + file[3:len(file) - 5] + '.png')
         plt.show()

@@ -19,7 +19,7 @@ from tqdm import tqdm
 import tkinter as tk
 from tkinter import *
 from tkinter import messagebox
-
+print(os.getcwd())
 import detectors
 
 
@@ -392,63 +392,190 @@ for i in tqdm(types_vehicle):
 imputed_df = pd.concat(imputed)  # датафрейм с дополненными данными
 
 which_sample = 'Rosautodor_1'
+
 if which_sample == 'Rosautodor_1':
     coef_sample = pd.read_excel('../raw_data/coeff_transform_to_TG.xlsx', sheet_name='sample_1')
 elif which_sample == 'Rosautodor_2':
     coef_sample = pd.read_excel('../raw_data/coeff_transform_to_TG.xlsx', sheet_name='sample_2')
 
-imputed_df = imputed_df.loc[time_interval_cond].reset_index().merge(coef_sample, how='left', on='type_vehicle').set_index('Дата')
-# imputed_df['TG'] = imputed_df['TG'].fillna('Все ТГ')
-imputed_df['Количество_ТГ'] = np.prod([imputed_df['Количество'], imputed_df['coeff']], axis=0)
+# Кол-во ТС за полный год (для оценки ССИД) - сразу в сечении
+amount_per_year_vehicle = imputed_df.loc[time_interval_cond].groupby(by=['direction', 'type_vehicle'])[
+    'Количество'].sum().unstack(0)
+amount_per_year_vehicle.loc[:, ['Обратное', 'Прямое']] *= 2
+amount_per_year_vehicle = amount_per_year_vehicle.T.stack()
 
-# tmp = imputed_df.groupby(by=['direction', 'TG', 'Дата'])['Количество_ТГ'].sum().unstack([0, 1])
-imputed_df['month'] = imputed_df.index.strftime("%B")
-imputed_df['day_of_week'] = imputed_df.index.strftime("%A")
-imputed_df['hour'] = imputed_df.index.strftime("%H")
 imputed_df['y_m_d'] = imputed_df.index.strftime('%Y-%m-%d')
 imputed_df['y_m_d'] = pd.to_datetime(imputed_df['y_m_d'])
 # imputed_df.dtypes
-foo = imputed_df.groupby(by=['y_m_d', 'direction', 'TG'])['Количество_ТГ'].sum().unstack([1, 2])
 
-max_value = np.max(foo, axis=0).replace(0, np.nan)
-min_value = np.min(foo, axis=0)
-mean_value = np.mean(foo, axis=0)
+# Считаю статистику по СУТОЧНОЙ интенсивности
+imputed_df_day = imputed_df.loc[time_interval_cond].groupby(by=['y_m_d', 'direction'])['Количество'].sum().unstack(
+    1)
+
+# Максимум за сутки
+max_value = np.max(imputed_df_day, axis=0).replace(0, np.nan)
+max_value.name = 'максимум'
+# Минимум за сутки
+min_value = np.min(imputed_df_day, axis=0)
+min_value.name = 'минимум'
+# Среднее значение за сутки
+mean_value = np.mean(imputed_df_day, axis=0)
+mean_value.name = 'среднесуточное'
+# Коэффициент перехода (максимум делить на среднее) - куда переход? - непонятки
 coeff_trans = max_value / mean_value
+coeff_trans.name = 'коэф_прехода'
 
+# ПОДУМОТЬ Среднее суточное значение, физ.ед. (в сечении) - что если естть данные только для одного направления
+# mean_cross_section = np.where(mean_value['Прямое'] == 0,
+#                               np.where(mean_value.index == 'Итого', mean_value['Итого'], mean_value),
+#                               np.where(mean_value['Обратное'] == 0,
+#                                        np.where(mean_value.index == 'Итого', mean_value['Итого'], mean_value),
+#                                        np.where(mean_value.index == 'Итого', mean_value['Итого'], mean_value * 2)))
+
+# Среднее суточное значение, физ.ед.
+mean_cross_section = pd.Series(np.where(mean_value.index == 'Итого', mean_value['Итого'], mean_value * 2),
+                               index=mean_value.index)
+mean_cross_section.name = 'среднесуточное в сечении'
+
+# ССИД в летний период
+mean_summer = np.mean(imputed_df_day['2024-06-01':'2024-08-31'], axis=0)
+mean_cross_section_summer = pd.Series(np.where(mean_summer.index == 'Итого', mean_summer['Итого'], mean_summer * 2),
+                                      index=mean_summer.index)
+mean_cross_section_summer.name = 'ССИД летом'
+
+# ССИД в зимний период
+mean_winter = np.mean(pd.concat([imputed_df_day['2024-01-01':'2024-02-29'],
+                                 imputed_df_day['2024-12-01':'2024-12-31']], axis=0), axis=0)
+mean_cross_section_winter = pd.Series(np.where(mean_winter.index == 'Итого', mean_winter['Итого'], mean_winter * 2),
+                                      index=mean_winter.index)
+mean_cross_section_winter.name = 'ССИД зимой'
+
+# ССИД в межсезонье
+mean_demiseasons = np.mean(pd.concat([imputed_df_day['2024-03-01':'2024-05-31'],
+                                      imputed_df_day['2024-09-01':'2024-11-30']], axis=0), axis=0)
+mean_cross_section_demiseasons = pd.Series(
+    np.where(mean_demiseasons.index == 'Итого', mean_demiseasons['Итого'], mean_demiseasons * 2),
+    index=mean_demiseasons.index)
+mean_cross_section_demiseasons.name = 'ССИД межсезонье'
+
+# Максимальный суточный поток, физ.ед.
+max_cross_section = pd.Series(np.where(max_value.index == 'Итого', max_value['Итого'], max_value * 2),
+                              index=max_value.index)
+max_cross_section.name = 'макс суточный поток'
+# Минимальный суточный поток, физ.ед.
+min_cross_section = pd.Series(np.where(min_value.index == 'Итого', min_value['Итого'], min_value * 2),
+                              index=min_value.index)
+min_cross_section.name = 'мин суточный поток'
+
+imputed_df['hour'] = imputed_df.index.strftime("%H").astype(int)
+
+# Максимальная часовая интенсивность в дневной период, физ.ед.
+max_hour_day = imputed_df[imputed_df.index.isin(time_interval_cond) & imputed_df['hour'].between(7, 22)].groupby(
+    by=['direction'])['Количество'].max()
+max_hour_day_cross_section = pd.Series(np.where(max_hour_day.index == 'Итого', max_hour_day['Итого'], max_hour_day * 2),
+                                       index=max_hour_day.index)
+max_hour_day_cross_section.name = 'макс часов интенсивность днем'
+
+# Максимальная часовая интенсивность в ночной период, физ.ед.
+max_hour_night = \
+imputed_df[imputed_df.index.isin(time_interval_cond) & imputed_df['hour'].isin([23, 0, 1, 2, 3, 4, 5, 6])].groupby(
+    by=['direction'])['Количество'].max()
+max_hour_night_cross_section = pd.Series(
+    np.where(max_hour_night.index == 'Итого', max_hour_night['Итого'], max_hour_night * 2),
+    index=max_hour_night.index)
+max_hour_night_cross_section.name = 'макс часов интенсивность ночью'
+# День, соответствующий суточному максимуму
 # создаю новый series для хранения результата (день, где был максимум)
-days_of_max = pd.Series(index=foo.columns, dtype=object)
+days_of_max = pd.Series(index=imputed_df_day.columns, dtype=object)
 
-for idx in foo.columns:
+for idx in imputed_df_day.columns:
     # idx = foo.columns[0]
     col = idx
-    matches = foo[col].isin([max_value[idx]])  # проверяю совпадения с соответствующим значением из max_value
+    matches = imputed_df_day[col].isin([max_value[idx]])  # проверяю совпадения с соответствующим значением из max_value
 
     if matches.sum() == 1:  # сохраняю день
-        days_of_max[idx] = foo[idx].index[matches].values
+        days_of_max[idx] = pd.to_datetime(imputed_df_day[idx].index[matches].date).strftime('%Y-%m-%d').values
     elif matches.sum() >= 2:  # если совпадений два или более, сохраняю список дней
-        days_of_max[idx] = [foo[idx].index[matches].values]
+        days_of_max[idx] = [pd.to_datetime(imputed_df_day[idx].index[matches].date).strftime('%Y-%m-%d').values]
     else:
-        days_of_max[idx] = np.nan  # проставляю np.nan, если совпадений нет
+        days_of_max[idx] = pd.Timestamp('NaT').to_pydatetime()  # проставляю np.nan, если совпадений нет
+days_of_max.name = 'день максимума'
+
+imputed_df_TG = imputed_df.loc[time_interval_cond].reset_index().merge(coef_sample,
+                                                                            how='left',
+                                                                            on='type_vehicle').set_index('Дата')
+# пересчитываю количество автомобилей уже на тарифные группы
+imputed_df_TG['Количество_ТГ'] = np.prod([imputed_df_TG['Количество'], imputed_df_TG['coeff']], axis=0)
+
+imputed_df_TG['month'] = imputed_df_TG.index.strftime("%B")
+imputed_df_TG['day_of_week'] = imputed_df_TG.index.strftime("%A")
+imputed_df_TG['hour'] = imputed_df_TG.index.strftime("%H")
 
 # считаю коэффициенты неравномерности
-coeff_by_month = imputed_df.groupby(by=['month', 'direction', 'TG'])['Количество_ТГ'].sum().unstack([1, 2])
+# по месяцам
+coeff_by_month = imputed_df_TG.groupby(by=['month', 'direction', 'TG'])['Количество_ТГ'].sum().unstack([1, 2])
 coeff_by_month = coeff_by_month.div(
     coeff_by_month.sum(axis=0),
     axis=1)
-
-coeff_by_weekday = imputed_df.groupby(by=['day_of_week', 'direction', 'TG'])['Количество_ТГ'].sum().unstack([1, 2])
+# по дням недели
+coeff_by_weekday = imputed_df_TG.groupby(by=['day_of_week', 'direction', 'TG'])['Количество_ТГ'].sum().unstack(
+    [1, 2])
 coeff_by_weekday = coeff_by_weekday.div(
     coeff_by_weekday.sum(axis=0),
     axis=1)
-
-coeff_by_hour = imputed_df.groupby(by=['hour', 'direction', 'TG'])['Количество_ТГ'].sum().unstack([1, 2])
+# по часам
+coeff_by_hour = imputed_df_TG.groupby(by=['hour', 'direction', 'TG'])['Количество_ТГ'].sum().unstack([1, 2])
 coeff_by_hour = coeff_by_hour.div(
     coeff_by_hour.sum(axis=0),
     axis=1)
 
-amount_per_year_vehicle = imputed_df.groupby(by=['direction', 'type_vehicle'])['Количество_ТГ'].sum()
-avg_annual_per_24_h_TG = imputed_df.groupby(by=['direction', 'TG'])['Количество_ТГ'].sum()/365
+# Величина среднегодовой суточной интенсивности В СЕЧЕНИИ по тарифным группам
+avg_annual_per_24_h_TG = amount_per_year_vehicle.unstack(0).reset_index().merge(coef_sample,
+                                                                                how='left',
+                                                                                on='type_vehicle').set_index(
+    'type_vehicle')
+avg_annual_per_24_h_TG.loc[:, 'Итого'] = avg_annual_per_24_h_TG.loc[:, 'Итого'] * avg_annual_per_24_h_TG.loc[:, 'coeff']
+avg_annual_per_24_h_TG.loc[:, 'Обратное'] = avg_annual_per_24_h_TG.loc[:, 'Обратное'] * avg_annual_per_24_h_TG.loc[:,
+                                                                                        'coeff']
+avg_annual_per_24_h_TG.loc[:, 'Прямое'] = avg_annual_per_24_h_TG.loc[:, 'Прямое'] * avg_annual_per_24_h_TG.loc[:,
+                                                                                    'coeff']
+avg_annual_per_24_h_TG = avg_annual_per_24_h_TG.groupby('TG')[['Итого', 'Прямое', 'Обратное']].sum() / 365
 
+# avg_annual_per_24_h_TG = imputed_df_TG.groupby(by=['direction', 'TG'])['Количество_ТГ'].sum() / 365 # а можно было в одну строчку D;    ;-----;
+
+place = 'км 198+500 а/д М-10 "Россия" Москва – Санкт-Петербург'
+new_file_name = 'PRE_' + place + '.xlsx'
+# создаю ID детектора
+if 'ММЗ' in new_file_name:
+    detector_id = re.search(r'[A-Z|А-Я]-\d+', new_file_name).group(0).lower() \
+                      .replace('-', '') + '_km' + re.search(r'\d+(?=\+)', new_file_name).group(0) + '_mv'
+else:
+    detector_id = re.search(r'[A-Z|А-Я]-\d+', new_file_name).group(0).lower() \
+                      .replace('-', '') + '_km' + re.search(r'\d+(?=\+)', new_file_name).group(0)
+
+# global bs_SSID
+# global bs_intensivnosti
+# SSID - транслитерация от СреднеСуточная Интенсивность Движения
+basic_stats_SSID = pd.concat([avg_annual_per_24_h_TG.astype(str).replace('nan', '0.0'),
+                                   max_value.to_frame().T.astype(str).replace('nan', '0.0'),
+                                   min_value.to_frame().T.astype(str).replace('nan', '0.0'),
+                                   mean_value.to_frame().T.astype(str).replace('nan', '0.0'),
+                                   coeff_trans.to_frame().T.astype(str).replace('nan', '0.0'),
+                                   mean_cross_section.to_frame().T.astype(str).replace('nan', '0.0'),
+                                   mean_cross_section_summer.to_frame().T.astype(str).replace('nan', '0.0'),
+                                   mean_cross_section_winter.to_frame().T.astype(str).replace('nan', '0.0'),
+                                   mean_cross_section_demiseasons.to_frame().T.astype(str).replace('nan', '0.0'),
+                                   max_cross_section.to_frame().T.astype(str).replace('nan', '0.0'),
+                                   min_cross_section.to_frame().T.astype(str).replace('nan', '0.0'),
+                                   max_hour_day_cross_section.to_frame().T.astype(str).replace('nan', '0.0'),
+                                   max_hour_night_cross_section.to_frame().T.astype(str).replace('nan', '0.0'),
+                                   days_of_max.to_frame().T.replace('NaT', '0.0')], axis=0).reset_index()
+basic_stats_SSID.index = [detector_id] * len(basic_stats_SSID)
+
+basic_stats_intensivnosti = pd.concat([coeff_by_month,
+                                            coeff_by_weekday,
+                                            coeff_by_hour], axis=0).reset_index()
+basic_stats_intensivnosti.index = [detector_id] * len(basic_stats_intensivnosti)
 
 
 # %% способы обработки пропусков
@@ -518,17 +645,37 @@ df_main_clear = pd.concat(df_main_clear)
 # df_total_long = df_total_long.query(f"type_vehicle == 'Общая интенсивность автомобилей'")
 
 # for window in range(3):
+# basic_stats_SSID_long = basic_stats_SSID.melt(ignore_index=False, col_level=0, value_vars=['Обратное', 'Прямое'], var_name='direction', value_name='Корректность')
+basic_stats_intensivnosti_long = basic_stats_intensivnosti.reset_index().set_index(['level_0', 'index'])\
+    .melt(ignore_index=False).reset_index(names=['detector_id', 'type'])
 
 
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 10))
+from matplotlib.gridspec import GridSpec
+import matplotlib.ticker as mtick
+fig = plt.figure(figsize=(20, 10))
+# fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 10))
 fig.suptitle(f'{file}', fontsize=13)
+
+gs = GridSpec(3, 2, figure=fig)
+ax1 = fig.add_subplot(gs[0, :])
+ax2 = fig.add_subplot(gs[1, :])
+ax3 = fig.add_subplot(gs[-1, 0])
+ax4 = fig.add_subplot(gs[-1, 1])
+# ax5 = fig.add_subplot(gs[-1, -1])
+
+# formatAxes(fig)
+# plt.show()
+
+
+# fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 10))  # 2 строки, 1 столбец
+# fig.suptitle(f'{file}', fontsize=13)
 colors_line = ['cornflowerblue', 'darkblue']
 colors_dots = ['lime', 'limegreen']
 directions = ['Прямое', 'Обратное']
 
 for idx, j in enumerate(directions):
     # j = 'Прямое'
-    tmp_df = df_main_clear.query(f"type_vehicle == 'Общая интенсивность автомобилей' and direction == '{j}'")
+    tmp_df = df_main_clear.query(f"type_vehicle == 'Общая интенсивность автомобилей' and direction == '{j}'").copy()
     tmp_df.loc[:, 'y_m_d'] = tmp_df.index.strftime('%Y-%m-%d').values
     tmp_df.loc[:, 'y_m_d'] = pd.to_datetime(tmp_df['y_m_d'])
 
@@ -559,11 +706,11 @@ for idx, j in enumerate(directions):
         ax1.legend(loc='best')  # Указываем, где разместить легенду
         # ax1.xaxis.set_major_locator(MonthLocator())
         # ax1.xaxis.set_major_formatter(DateFormatter('%Y-%m'))
-        ax1.set_ylabel('Количество / Заполненное значение')  # Подпись оси Y
+        ax1.set_ylabel('Дополненное количество')  # Подпись оси Y
         ax1.set_xlabel('Время')  # Подпись оси X
 
 for idx, j in enumerate(directions):
-    tmp_df_raw = df_total_long.query(f"type_vehicle == 'Общая интенсивность автомобилей' and direction == '{j}'").replace(np.nan, 0)
+    tmp_df_raw = df_total_long.query(f"type_vehicle == 'Общая интенсивность автомобилей' and direction == '{j}'").replace(np.nan, 0).copy()
     tmp_df_raw.loc[:, 'y_m_d'] = tmp_df_raw.index.strftime('%Y-%m-%d').values
     tmp_df_raw.loc[:, 'y_m_d'] = pd.to_datetime(tmp_df_raw['y_m_d'])
 
@@ -581,9 +728,49 @@ for idx, j in enumerate(directions):
         ax2.set_ylabel('Количество')  # Подпись оси Y
         ax2.set_xlabel('Время')  # Подпись оси X
 
-plt.rcParams['font.size'] = 14
-plt.legend(loc='best')
-plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+for idx, j in enumerate(directions):
+    # создаю графики для недельной и часовой интенсивности
+    # j = 'Прямое'
+    weekdays_list = ["Monday", "Tuesday", "Wednesday", "Thursday",
+                "Friday", "Saturday", "Sunday"]
+    hours_list = ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10',
+                  '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21',
+                  '22', '23']
+    colors_intens = {'Прямое': ['red', 'salmon', 'coral', 'tomato', 'orangered'],  # ['red', 'blue', 'orange', 'green', 'purple'],
+              'Обратное': ['blue', 'skyblue', 'royalblue', 'dodgerblue', 'steelblue'],  # ['teal', 'deeppink', 'cyan', 'yellow', 'peru'],
+              'Итого': ['orange', 'goldenrod', 'darkorange', 'gold', 'khaki']}  # ['orange', 'goldenrod', 'darkorange', 'gold', 'khaki']}
+
+    for i, tg_name in enumerate(['Все ТГ', 'ТГ-1', 'ТГ-2', 'ТГ-3', 'ТГ-4']):
+        # tg_name = 'Все ТГ'
+        weekday = basic_stats_intensivnosti_long.query(f"direction == '{j}' and type in {weekdays_list} and TG == '{tg_name}'")\
+            .set_index('type').reindex(weekdays_list).reset_index()#.replace(np.nan, 0)
+        hour = basic_stats_intensivnosti_long.query(f"direction == '{j}' and type in {hours_list} and TG == '{tg_name}'")
+        enumerate(column_names.items())
+        # for k in range(15):
+        #     color_index = k // 5
+        if not weekday.empty:
+            ax3.plot(weekday['type'],
+                     weekday['value'],
+                     color=colors_intens[j][i % 5],
+                     label=f'{tg_name}, {j}')
+
+            ax4.plot(hour['type'],
+                     hour['value'],
+                     color=colors_intens[j][i % 5],
+                     label=f'{tg_name}, {j}')
+
+ax3.yaxis.set_major_formatter(mtick.PercentFormatter(1, decimals=0))
+ax3.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=5, fontsize=9)
+ax3.set_ylabel('Процент')  # Подпись оси Y
+ax3.set_xlabel('День недели')  # Подпись оси X
+ax4.yaxis.set_major_formatter(mtick.PercentFormatter(1, decimals=0))
+ax4.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=5, fontsize=9)
+ax4.set_ylabel('Процент')  # Подпись оси Y
+ax4.set_xlabel('Часы')  # Подпись оси X
+plt.rcParams['font.size'] = 12
+# plt.legend(loc='best')
+# plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 # plt.savefig('../raw_data/2024/Графики/' + 'PIC' + file[3:len(file) - 5] + '.png')
 plt.show()
 
@@ -593,5 +780,5 @@ plt.show()
 
 
 
-df_total_long.loc[cond &
-                  (df_total_long.index.isin(time_interval_cond))].plot(style=['k--', 'bo-', 'r*'], figsize=(20, 10))
+# df_total_long.loc[cond &
+#                   (df_total_long.index.isin(time_interval_cond))].plot(style=['k--', 'bo-', 'r*'], figsize=(20, 10))
