@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="PYTHON_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/pythonProject" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/raw_data/ГК/2023" />
+      <excludeFolder url="file://$MODULE_DIR$/raw_data/ГК/2024" />
+      <excludeFolder url="file://$MODULE_DIR$/raw_data/ГК/2025" />
+      <excludeFolder url="file://$MODULE_DIR$/raw_data/ФДА/2023" />
+      <excludeFolder url="file://$MODULE_DIR$/raw_data/ФДА/2024" />
+      <excludeFolder url="file://$MODULE_DIR$/parsed_GK/2023" />
+      <excludeFolder url="file://$MODULE_DIR$/parsed_GK/done_2023" />
+      <excludeFolder url="file://$MODULE_DIR$/parsed_GK/done_2024" />
+      <excludeFolder url="file://$MODULE_DIR$/parsed_GK/done_2025" />
+      <excludeFolder url="file://$MODULE_DIR$/pythonProject/parsed_GK" />
+      <excludeFolder url="file://$MODULE_DIR$/raw_data/ГК — копия/2023" />
+      <excludeFolder url="file://$MODULE_DIR$/raw_data/ГК — копия/2024" />
+      <excludeFolder url="file://$MODULE_DIR$/raw_data/ГК — копия/2025" />
+      <excludeFolder url="file://$MODULE_DIR$/raw_data/ФДА — копия/2023" />
+      <excludeFolder url="file://$MODULE_DIR$/raw_data/ФДА — копия/2024" />
+      <excludeFolder url="file://$MODULE_DIR$/pythonProject/.idea" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+  <component name="PyDocumentationSettings">
+    <option name="renderExternalDocumentation" value="true" />
+  </component>
+</module>
